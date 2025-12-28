@@ -55,6 +55,8 @@ WHATSAPP_ADMIN = os.environ.get("WHATSAPP_ADMIN", "2348165017875")
 def send_email(to, subject, template, **context):
     if not SMTP_EMAIL or not SMTP_PASSWORD:
         return
+        print("Email not configured")
+       
     msg = EmailMessage()
     msg["From"] = SMTP_EMAIL
     msg["To"] = to
@@ -107,7 +109,7 @@ class Submission(db.Model):
     service = db.Column(db.String(100))
     filename = db.Column(db.String(200))
     status = db.Column(db.String(50), default="Pending")
-    amount = db.Column(db.Integer, default=20000)
+    amount = db.Column(db.Integer, default=200)
     paid = db.Column(db.Boolean, default=False)
     receipt = db.Column(db.String(200))
     reference = db.Column(db.String(100))
@@ -135,6 +137,11 @@ def admin_required(f):
             return redirect(url_for("login"))
         return f(*args, **kwargs)
     return decorated
+    
+# ==================== HOME ====================
+@app.route("/")
+def home():
+    return render_template("home.html")
 
 # ==================== AUTH ====================
 @app.route("/register", methods=["GET", "POST"])
@@ -171,21 +178,31 @@ def logout():
 @login_required
 def submit():
     if request.method == "POST":
+        service = request.form["service"]
+
+        SERVICE_PRICES = {
+            "SIWES Placement": 200,
+            "PROJECT PROPOSAL/PROJECT BIDING": 200,
+        }
+
+        amount = SERVICE_PRICES.get(service, 200)
+
         f = request.files["file"]
         name = secure_filename(f.filename)
         f.save(os.path.join(app.config["UPLOAD_FOLDER"], name))
 
         sub = Submission(
-            service=request.form["service"],
+            service=service,
             filename=name,
+            amount=amount,
             user=current_user
         )
         db.session.add(sub)
         db.session.commit()
 
         return redirect(url_for("whatsapp_redirect", sid=sub.id))
-    return render_template("student/submit.html")
 
+    return render_template("student/submit.html")
 
 @app.route("/track")
 @login_required
@@ -240,7 +257,7 @@ def payment_verify():
 
     data = res.json()["data"]
 
-    if data["status"] == "success":
+    if data["status"] == "success" and data["amount"] == sub.amount * 200:
         sub = Submission.query.filter_by(
             user_id=current_user.id,
             paid=False
@@ -330,4 +347,5 @@ def api_submissions(user_id):
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
-    app.run(debug=True)
+        app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+        

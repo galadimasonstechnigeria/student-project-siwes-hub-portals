@@ -8,11 +8,18 @@
 <h2>Submit SIWES Project</h2>
 
 <form method="POST" enctype="multipart/form-data">
+
     <label>Service</label><br>
-    <input type="text" name="service" required><br><br>
+    <select name="service" required>
+        <option value="">-- Select Service --</option>
+        <option value="SIWES Placement">SIWES Placement</option>
+        <option value="PROJECT PROPOSAL/PROJECT BIDING">PROJECT SERVICES</option>
+    </select>
+    <br><br>
 
     <label>Upload Letter</label><br>
-    <input type="file" name="file" required><br><br>
+    <input type="file" name="file" required>
+    <br><br>
 
     <button type="submit">Submit</button>
 </form>
