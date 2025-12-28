@@ -143,36 +143,52 @@ def admin_required(f):
 def home():
     return render_template("home.html")
 
-# ==================== AUTH ====================
-@app.route("/register", methods=["GET", "POST"])
-def register():
-    if request.method == "POST":
-        db.session.add(User(
-            fullname=request.form["fullname"],
-            email=request.form["email"],
-            password=generate_password_hash(request.form["password"])
-        ))
-        db.session.commit()
-        return redirect(url_for("login"))
-    return render_template("auth/register.html")
 
+# ==================== Login ====================
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        u = User.query.filter_by(email=request.form["email"]).first()
-        if u and check_password_hash(u.password, request.form["password"]):
-            login_user(u)
-            return redirect(url_for("submit"))
+        email = request.form["email"]
+        password = request.form["password"]
+
+        user = User.query.filter_by(email=email).first()
+
+        if not user or not check_password_hash(user.password, password):
+            flash("Invalid email or password")
+            return redirect(url_for("login"))
+
+        login_user(user)
+        return redirect(url_for("submit"))
+
     return render_template("auth/login.html")
+    
+# ==================== AUTH ====================
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if request.method == "POST":
+        email = request.form["email"]
 
+        # CHECK IF USER EXISTS
+        existing_user = User.query.filter_by(email=email).first()
+        if existing_user:
+            flash("Email already registered. Please login.")
+            return redirect(url_for("login"))
 
-@app.route("/logout")
-@login_required
-def logout():
-    logout_user()
-    return redirect(url_for("login"))
+        user = User(
+            fullname=request.form["fullname"],
+            email=email,
+            password=generate_password_hash(request.form["password"]),
+            role="student"
+        )
+        db.session.add(user)
+        db.session.commit()
 
+        flash("Registration successful. Please login.")
+        return redirect(url_for("login"))
+
+    return render_template("auth/register.html")
+    
 # ==================== STUDENT ====================
 @app.route("/submit", methods=["GET", "POST"])
 @login_required
@@ -347,5 +363,6 @@ def api_submissions(user_id):
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
-        app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+        app.run(debug=True, host="127.0.0.1", port=5000)
+
         
