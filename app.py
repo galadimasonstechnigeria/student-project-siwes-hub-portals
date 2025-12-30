@@ -54,9 +54,9 @@ WHATSAPP_ADMIN = os.environ.get("WHATSAPP_ADMIN", "2348165017875")
 
 # ==================== HELPERS ====================
 def send_email(to, subject, template, **context):
-if not SMTP_EMAIL or not SMTP_PASSWORD:
-    print("Email not configured")
-    return
+    if not SMTP_EMAIL or not SMTP_PASSWORD:
+        print("Email not configured")
+        return
     
     msg = EmailMessage()
     msg["From"] = SMTP_EMAIL
@@ -155,7 +155,7 @@ def login():
 
         user = User.query.filter_by(email=email).first()
 
-      if user and check_password_hash(user.password, data.get("password")):
+        if not user or not check_password_hash(user.password, password):
             flash("Invalid email or password")
             return redirect(url_for("login"))
 
