@@ -29,7 +29,8 @@ app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret")
 app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
     "DATABASE_URL", "sqlite:///siwes.db"
 )
-app.config["UPLOAD_FOLDER"] = "uploads"
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+app.config["UPLOAD_FOLDER"] = os.path.join(BASE_DIR, "uploads")
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
 
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
@@ -53,10 +54,10 @@ WHATSAPP_ADMIN = os.environ.get("WHATSAPP_ADMIN", "2348165017875")
 
 # ==================== HELPERS ====================
 def send_email(to, subject, template, **context):
-    if not SMTP_EMAIL or not SMTP_PASSWORD:
-        return
-        print("Email not configured")
-       
+if not SMTP_EMAIL or not SMTP_PASSWORD:
+    print("Email not configured")
+    return
+    
     msg = EmailMessage()
     msg["From"] = SMTP_EMAIL
     msg["To"] = to
@@ -154,7 +155,7 @@ def login():
 
         user = User.query.filter_by(email=email).first()
 
-        if not user or not check_password_hash(user.password, password):
+      if user and check_password_hash(user.password, data.get("password")):
             flash("Invalid email or password")
             return redirect(url_for("login"))
 
@@ -261,6 +262,10 @@ Amount: ₦{s.amount}
 def payment_verify():
     reference = request.args.get("reference")
 
+    if not reference:
+        flash("Invalid payment reference")
+        return redirect(url_for("track"))
+
     headers = {"Authorization": f"Bearer {PAYSTACK_SECRET_KEY}"}
     res = requests.get(
         f"https://api.paystack.co/transaction/verify/{reference}",
@@ -271,21 +276,23 @@ def payment_verify():
         flash("Payment verification failed")
         return redirect(url_for("track"))
 
-    data = res.json()["data"]
+    data = res.json().get("data")
 
-    if data["status"] == "success" and data["amount"] == sub.amount * 200:
-        sub = Submission.query.filter_by(
-            user_id=current_user.id,
-            paid=False
-        ).order_by(Submission.id.desc()).first()
+    sub = Submission.query.filter_by(
+        user_id=current_user.id,
+        paid=False
+    ).order_by(Submission.id.desc()).first()
 
-        if sub:
-            sub.paid = True
-            sub.status = "Paid"
-            sub.reference = reference
-            sub.receipt = generate_receipt(sub)
-            db.session.commit()
+    if not sub:
+        flash("No pending submission found")
+        return redirect(url_for("track"))
 
+    if data["status"] == "success":
+        sub.paid = True
+        sub.status = "Paid"
+        sub.reference = reference
+        sub.receipt = generate_receipt(sub)
+        db.session.commit()
         flash("Payment successful")
     else:
         flash("Payment failed")
@@ -359,7 +366,6 @@ def api_submissions(user_id):
 
 
 # ==================== RUN ====================
-
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
